@@ -1,8 +1,6 @@
-# Login first into the aws docker registry, beforing running docker build:
-# aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.eu-west-2.amazonaws.com
-FROM 763104351884.dkr.ecr.eu-west-2.amazonaws.com/pytorch-inference:1.10.2-gpu-py38-cu113-ubuntu20.04-ec2
+FROM pytorch/torchserve:latest-gpu
 USER root
-# RUN apt-get update
+RUN apt-get update
 RUN apt-get install -y libgl1-mesa-glx
 RUN apt-get install -y libglib2.0-0
 # RUN apt-get install -y python3-distutils
@@ -11,12 +9,14 @@ RUN pip install torch-model-archiver
 RUN pip install opencv-python
 COPY ./res/minimal-requirements.txt /home/model-server/res/requirements.txt
 # RUN pip install -r /home/model-server/res/requirements.txt
-RUN pip install pandas seaborn
+RUN pip install pandas seaborn pyyaml
 RUN python -c "import torch; m=torch.hub.load('ultralytics/yolov5','yolov5s',pretrained=True)"
 RUN python /root/.cache/torch/hub/ultralytics_yolov5_master/export.py --weights yolov5s.pt --include torchscript --batch 1 --device 0
+RUN pip install nvgpu
 COPY ./res/torchserve_handler.py ./torchserve_handler.py
 RUN torch-model-archiver --model-name yolov5s --version 0.1 --serialized-file yolov5s.torchscript --handler torchserve_handler.py
-RUN mv yolov5s.mar model-store/yolov5s.mar
+RUN mkdir model-store; mv yolov5s.mar model-store/yolov5s.mar
+COPY ./res/config.properties ./config.properties
 CMD [ "torchserve", "--start", "--model-store", "model-store", "--models", "yolov5s=yolov5s.mar" ]
 
 
