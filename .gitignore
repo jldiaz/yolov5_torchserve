@@ -1,0 +1,5 @@
+logs/
+ressources/datasets/
+*.torchscript
+*.pt
+*.mar
