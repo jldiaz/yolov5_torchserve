@@ -1,0 +1,17 @@
+## Build the image torchserve locally before running this, cf github torchserve:
+## https://github.com/pytorch/serve/tree/master/docker
+FROM pytorch/torchserve:latest
+USER root
+RUN apt-get update
+RUN apt-get install -y libgl1-mesa-glx
+RUN apt-get install -y libglib2.0-0
+RUN apt-get install -y python3-distutils
+RUN pip3 install --upgrade pip
+RUN pip install torch-model-archiver
+RUN pip install opencv-python
+EXPOSE 8080 8081
+COPY ./yolov5s.mar /home/model-server/model_store/yolov5s.mar
+RUN chmod -R a+rw /home/model-server/
+USER model-server
+CMD [ "torchserve", "--start", "--model-store", "/home/model-server/model_store", "--models", "yolov5s=yolov5s.mar" ]
+
