@@ -1,6 +1,7 @@
 from inspect import trace
 import time
 import traceback
+import json
 
 from ts.torch_handler.base_handler import BaseHandler
 import numpy as np
@@ -53,6 +54,8 @@ class ModelHandler(BaseHandler):
         self.initialized = False
         self.batch_size = 1
         self.img_size = 640
+        # with open("index_to_name.json") as f:
+        #     self.index_to_name = json.load(f)
 
     def preprocess(self, data):
         """
@@ -92,9 +95,16 @@ class ModelHandler(BaseHandler):
         # Take output from network and post-process to desired format
         postprocess_output = inference_output
         pred = non_max_suppression(postprocess_output[0], conf_thres=0.6)
-        pred = [p.tolist() for p in pred]
-        return [pred]
+        return [{"results": self.get_info(p.tolist())} for p in pred]
 
+    def get_info(self, p:list):
+        if self.mapping is None:
+            self.mapping = {}
+        return [{"bounding_box": d[:4], 
+                 "confidence": d[-2], 
+                 "cls": int(d[-1]), 
+                 "label": self.mapping.get(str(int(d[-1])), "")}
+                  for d in p]
 
 def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None, agnostic=False, labels=()):
     """
