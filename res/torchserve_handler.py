@@ -60,7 +60,7 @@ class ModelHandler(BaseHandler):
     def preprocess(self, data):
         """
         Transform raw input into model input data.
-        :param batch: list of raw requests, should match batch size
+        :param data: list of raw requests, should match batch size
         :return: list of preprocessed model input data
         """
         list_img_names = ["img" + str(i) for i in range(1, self.batch_size + 1)]
@@ -84,6 +84,7 @@ class ModelHandler(BaseHandler):
                 inputs[i, :, :, :] = input
             except Exception as e:
                 print(traceback.format_exc())
+        self.t1 = time.perf_counter()
         return inputs
 
     def postprocess(self, inference_output):
@@ -93,9 +94,10 @@ class ModelHandler(BaseHandler):
         :return: list of predict results
         """
         # Take output from network and post-process to desired format
+        inference_time = time.perf_counter() - self.t1
         postprocess_output = inference_output
         pred = non_max_suppression(postprocess_output[0], conf_thres=0.6)
-        return [{"results": self.get_info(p.tolist())} for p in pred]
+        return [{"meta": {"time": inference_time}, "results": self.get_info(p.tolist())} for p in pred]
 
     def get_info(self, p:list):
         if self.mapping is None:
