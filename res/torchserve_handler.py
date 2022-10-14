@@ -1,47 +1,12 @@
 from inspect import trace
 import time
 import traceback
-import json
 
 from ts.torch_handler.base_handler import BaseHandler
 import numpy as np
 import torch
 import torchvision
 import cv2
-
-
-# Taken from yolov5/utils/augmentations.py
-def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
-    # Resize and pad image while meeting stride-multiple constraints
-    shape = im.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape)
-
-    # Scale ratio (new / old)
-    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-    if not scaleup:  # only scale down, do not scale up (for better val mAP)
-        r = min(r, 1.0)
-
-    # Compute padding
-    ratio = r, r  # width, height ratios
-    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
-    if auto:  # minimum rectangle
-        dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
-    elif scaleFill:  # stretch
-        dw, dh = 0.0, 0.0
-        new_unpad = (new_shape[1], new_shape[0])
-        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
-
-    dw /= 2  # divide padding into 2 sides
-    dh /= 2
-
-    if shape[::-1] != new_unpad:  # resize
-        im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
-    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-    return im, ratio, (dw, dh)
 
 class ModelHandler(BaseHandler):
     """
@@ -63,6 +28,7 @@ class ModelHandler(BaseHandler):
         :param data: list of raw requests, should match batch size
         :return: list of preprocessed model input data
         """
+        self.t0 = time.perf_counter()
         list_img_names = ["img" + str(i) for i in range(1, self.batch_size + 1)]
         inputs = torch.zeros(self.batch_size, 3, self.img_size, self.img_size)
         for i, img_name in enumerate(list_img_names):
@@ -72,10 +38,6 @@ class ModelHandler(BaseHandler):
                 file_bytes = np.asarray(bytearray(byte_array), dtype=np.uint8)
                 # yolov5 preprocessing
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-                # THIS WAS ADDED. Otherwise the API only accepts 640x640 images
-                # The following line rescales the image so that the result is always 640x640
-                # The stride is made equal to the image widht/height, so that filling bands are always added
-                img = letterbox(img, (self.img_size, self.img_size), stride=self.img_size)[0]  # padded resize
                 img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
                 img = np.ascontiguousarray(img)
                 input = torch.from_numpy(img)
@@ -94,10 +56,18 @@ class ModelHandler(BaseHandler):
         :return: list of predict results
         """
         # Take output from network and post-process to desired format
-        inference_time = time.perf_counter() - self.t1
+        self.t2 = time.perf_counter()
         postprocess_output = inference_output
         pred = non_max_suppression(postprocess_output[0], conf_thres=0.6)
-        return [{"meta": {"time": inference_time}, "results": self.get_info(p.tolist())} for p in pred]
+        results = self.get_info(pred[0].tolist())
+        self.t3 = time.perf_counter()
+        return [{"meta": {
+            "preprocess_time": self.t1-self.t0,
+            "inference_time": self.t2-self.t1,
+            "postprocess_time": self.t3-self.t2,
+            "total_internal_time": self.t3-self.t0
+            }, 
+            "results": results}]
 
     def get_info(self, p:list):
         if self.mapping is None:
@@ -200,16 +170,6 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.6, classes=None,
         # Limit detections.
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
-        if merge and (1 < n < 3E3):
-
-            # Merge NMS (boxes merged using weighted mean).
-            # Update boxes as boxes(i,4) = weights(i,n) * boxes(n,4).
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            weights = iou * scores[None]  # box weights
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
-
         output[xi] = x[i]
         if (time.time() - t) > time_limit:
             break  # time limit exceeded
