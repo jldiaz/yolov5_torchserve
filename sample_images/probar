@@ -1,0 +1,1 @@
+http --multipart POST localhost:50000/predictions/yolov5s img1@$1

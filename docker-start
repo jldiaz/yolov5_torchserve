@@ -1,0 +1,1 @@
+docker run --runtime nvidia --name yolo --rm -d -p 50000:8080 torchserve_yolo_gpu:4.4s

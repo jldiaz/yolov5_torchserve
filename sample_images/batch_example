@@ -1,0 +1,4 @@
+http --multipart POST localhost:50000/predictions/yolov5sb4 img1@perro-robot-resized.jpg > perro-results.json &
+http --multipart POST localhost:50000/predictions/yolov5sb4 img1@bus-resized.jpg > bus-results.json &
+http --multipart POST localhost:50000/predictions/yolov5sb4 img1@horses-resized.jpg > horses-results.json &
+http --multipart POST localhost:50000/predictions/yolov5sb4 img1@zidane-resized.jpg > zidane-results.json &

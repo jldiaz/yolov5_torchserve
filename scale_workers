@@ -1,0 +1,3 @@
+model=${2:-yolov5sb4}
+workers=${1:-4}
+curl -v -X PUT "http://172.17.0.2:8081/models/${model}?min_worker=${workers}&synchronous=true"

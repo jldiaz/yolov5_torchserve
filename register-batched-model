@@ -1,0 +1,2 @@
+batch_size="${1:-4}"
+curl -X POST "172.17.0.2:8081/models?model_name=yolov5sb${batch_size}&url=yolov5s.mar&batch_size=${batch_size}&initial_workers=1&max_batch_delay=5000&synchronous=true"

@@ -1,0 +1,5 @@
+http 172.17.0.2:8081/models/
+if [ "$1" ] 
+then
+    http 172.17.0.2:8081/models/$1
+fi
