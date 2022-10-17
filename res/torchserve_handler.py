@@ -17,7 +17,7 @@ class ModelHandler(BaseHandler):
         super().__init__()
         self._context = None
         self.initialized = False
-        self.batch_size = 1
+        self.batch_size = 4
         self.img_size = 640
         # with open("index_to_name.json") as f:
         #     self.index_to_name = json.load(f)
@@ -29,12 +29,13 @@ class ModelHandler(BaseHandler):
         :return: list of preprocessed model input data
         """
         self.t0 = time.perf_counter()
-        list_img_names = ["img" + str(i) for i in range(1, self.batch_size + 1)]
+        self.batch_size = len(data)
+        print([ list(d.keys())  for d in data ])
         inputs = torch.zeros(self.batch_size, 3, self.img_size, self.img_size)
-        for i, img_name in enumerate(list_img_names):
+        for i, d in enumerate(data):
             try:
                 # Take the input data and make it inference ready
-                byte_array = data[0][img_name]
+                byte_array = list(d.values())[0]
                 file_bytes = np.asarray(bytearray(byte_array), dtype=np.uint8)
                 # yolov5 preprocessing
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
@@ -59,7 +60,7 @@ class ModelHandler(BaseHandler):
         self.t2 = time.perf_counter()
         postprocess_output = inference_output
         pred = non_max_suppression(postprocess_output[0], conf_thres=0.6)
-        results = self.get_info(pred[0].tolist())
+        results = [ self.get_info(p.tolist()) for p in pred ]
         self.t3 = time.perf_counter()
         return [{"meta": {
             "preprocess_time": self.t1-self.t0,
@@ -67,7 +68,7 @@ class ModelHandler(BaseHandler):
             "postprocess_time": self.t3-self.t2,
             "total_internal_time": self.t3-self.t0
             }, 
-            "results": results}]
+            "results": r} for r in results]
 
     def get_info(self, p:list):
         if self.mapping is None:
