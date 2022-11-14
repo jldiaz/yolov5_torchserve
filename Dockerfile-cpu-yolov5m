@@ -1,0 +1,25 @@
+FROM pytorch/torchserve:latest
+USER root
+RUN apt-get update
+RUN apt-get install -y libgl1-mesa-glx
+RUN apt-get install -y libglib2.0-0
+# RUN apt-get install -y python3-distutils
+RUN pip3 install --upgrade pip
+RUN pip install torch-model-archiver
+RUN pip install opencv-python
+COPY ./res/minimal-requirements.txt /home/model-server/res/requirements.txt
+# RUN pip install -r /home/model-server/res/requirements.txt
+RUN pip install pandas seaborn pyyaml
+RUN pip install ipython
+RUN python -c "import torch; m=torch.hub.load('ultralytics/yolov5','yolov5m',pretrained=True)"
+RUN python /root/.cache/torch/hub/ultralytics_yolov5_master/export.py --weights yolov5m.pt --include torchscript --batch 1 --device cpu
+# RUN pip install nvgpu
+COPY ./res/torchserve_handler.py ./torchserve_handler.py
+COPY ./res/index_to_name.json ./index_to_name.json
+RUN torch-model-archiver --model-name yolov5m --version 0.1 --serialized-file yolov5m.torchscript --handler torchserve_handler.py --extra-files index_to_name.json,torchserve_handler.py
+RUN mkdir model-store; mv yolov5m.mar model-store/yolov5m.mar
+COPY ./res/config.properties ./config.properties
+CMD [ "torchserve", "--start", "--model-store", "model-store", "--models", "yolov5m=yolov5m.mar" ]
+
+
+
